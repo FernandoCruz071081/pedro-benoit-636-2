@@ -479,7 +479,7 @@ export default function App() {
             </div>
 
             <div style={{maxWidth:920,margin:"0 auto",padding:"32px 24px 64px"}}>
-              {tab==="inicio" && <TabCalendario tenidas={tenidas} confs={confs} toggleConf={toggleConf} miConf={miConf} actas={actas} cu={cu} onAgregarActa={agregarActa} onEliminarActa={eliminarActa}/>}
+              {tab==="inicio" && <TabCalendario tenidas={tenidas} confs={confs} toggleConf={toggleConf} miConf={miConf} actas={actas} cu={cu} usuarios={usuarios} onAgregarActa={agregarActa} onEliminarActa={eliminarActa}/>}
               {tab==="tenidas" && <TabTenidas tenidas={tenidas} confs={confs} toggleConf={toggleConf} miConf={miConf}/>}
               {tab==="planchas" && <TabPlanchas planchas={planchas} usuarios={usuarios} cu={cu} onAgregar={agregarPlancha} onEliminar={eliminarPlancha} esVM={esVM}/>}
               {tab==="hermanos" && <TabHermanos usuarios={usuarios} cu={cu}/>}
@@ -496,7 +496,7 @@ export default function App() {
 }
 
 // ─── CALENDARIO ───────────────────────────────────────────────────────────────
-function TabCalendario({ tenidas, confs, toggleConf, miConf, actas, cu, onAgregarActa, onEliminarActa }) {
+function TabCalendario({ tenidas, confs, toggleConf, miConf, actas, cu, usuarios, onAgregarActa, onEliminarActa }) {
   const T = useT();
   const hoy = new Date();
   const [anio, setAnio] = useState(hoy.getFullYear());
@@ -508,6 +508,25 @@ function TabCalendario({ tenidas, confs, toggleConf, miConf, actas, cu, onAgrega
   tenidas.forEach(t => { const d=new Date(t.fecha+"T12:00:00"); if(d.getFullYear()===anio&&d.getMonth()===mes) mapaTenidas[d.getDate()]=t; });
   const proxima = tenidas.filter(t=>new Date(t.fecha+"T12:00:00")>=hoy).sort((a,b)=>a.fecha.localeCompare(b.fecha))[0];
   const confProxima = proxima ? miConf(proxima.id) : {};
+  const cumples = [];
+  const hoy0 = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime();
+  Object.entries(usuarios || {}).forEach(([k, u]) => {
+    const fn = u?.perfil?.fechaNacimiento;
+    if (!fn) return;
+    const nac = new Date(fn + "T12:00:00");
+    if (isNaN(nac.getTime())) return;
+    let prox = new Date(hoy.getFullYear(), nac.getMonth(), nac.getDate(), 12, 0, 0);
+    if (prox.getTime() < hoy0) prox = new Date(hoy.getFullYear() + 1, nac.getMonth(), nac.getDate(), 12, 0, 0);
+    cumples.push({
+      key: k, nombre: nomCompleto(u), grado: u.grado || "",
+      fechaTxt: prox.toLocaleDateString("es-AR", { day: "numeric", month: "long" }),
+      dias: Math.round((prox.getTime() - hoy0) / 86400000),
+      edad: prox.getFullYear() - nac.getFullYear(),
+      esHoy: prox.getTime() === hoy0,
+      ts: prox.getTime()
+    });
+  });
+  cumples.sort((a, b) => a.ts - b.ts);
 
   const celdas = [];
   for(let i=0;i<primerDia;i++) celdas.push(null);
@@ -534,6 +553,27 @@ function TabCalendario({ tenidas, confs, toggleConf, miConf, actas, cu, onAgrega
             {proxima.agape && <BtnConfirmar activo={confProxima.agape} onClick={()=>toggleConf(proxima.id,"agape")} label="+ Confirmar ágape" labelActivo="✓ Ágape confirmado" secundario/>}
             <BtnConfirmar activo={confProxima.asistencia===false} onClick={()=>toggleConf(proxima.id,"noAsiste")} label="No asisto" labelActivo="✗ No voy" peligro/>
           </div>
+        </div>
+      )}
+
+      {cumples.length > 0 && (
+        <div style={{background:T.bgCard,border:`1.5px solid ${T.border}`,borderLeft:`4px solid ${T.cyan}`,borderRadius:14,padding:"22px 28px",marginBottom:28}}>
+          <div style={{fontSize:13,fontWeight:700,letterSpacing:"0.25em",color:T.cyan,textTransform:"uppercase",marginBottom:6}}>✦ Próximos Cumpleaños</div>
+          {cumples.slice(0,5).map(c => (
+            <div key={c.key} style={{display:"flex",alignItems:"center",justifyContent:"space-between",gap:12,padding:"10px 0",borderBottom:`1px solid ${T.border}`,flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:12}}>
+                <MasonicAvatar grado={c.grado} size={34}/>
+                <div>
+                  <div style={{fontSize:15,fontWeight:700,color:T.texto}}>{c.nombre}</div>
+                  <div style={{fontSize:13,color:T.textoSec}}>{c.grado}</div>
+                </div>
+              </div>
+              <div style={{textAlign:"right"}}>
+                <div style={{fontSize:15,fontWeight:800,color:c.esHoy?T.peligro:T.cyan}}>{c.esHoy?"¡Hoy! 🎉":c.fechaTxt}</div>
+                <div style={{fontSize:12,color:T.textoSec}}>{c.esHoy?"":c.dias===1?"Mañana · cumple "+c.edad+" años":"En "+c.dias+" días · cumple "+c.edad+" años"}</div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
